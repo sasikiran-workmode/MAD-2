@@ -6,6 +6,7 @@ Parallelism is handled by QueryRouter via ThreadPoolExecutor.
 import html
 import re
 import time
+import urllib.parse
 from typing import List, Dict, Any, Optional
 
 import httpx
@@ -26,6 +27,8 @@ class SearchAgentConfig(AgentConfig):
 
 class SearchAgent(BaseAgent):
     """Agent that retrieves evidence using web search (synchronous)."""
+
+    _PROVIDER_LABEL = {"duckduckgo": "DuckDuckGo", "wikipedia": "Wikipedia", "crossref": "Crossref"}
 
     def __init__(self, config: Optional[SearchAgentConfig] = None):
         super().__init__(config or SearchAgentConfig())
@@ -71,25 +74,64 @@ class SearchAgent(BaseAgent):
     # Provider implementations — NO cross-provider fallbacks              #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _classify_provider_issue(exc: Exception) -> str:
+        """Reduce a provider failure to a short human note (rate limit/timeout/…)."""
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        text = str(exc).lower()
+        if status == 429 or "429" in text or "rate limit" in text or "too many" in text:
+            return "rate limit exceeded (429)"
+        if isinstance(exc, httpx.TimeoutException) or "timed out" in text or "timeout" in text:
+            return "timed out"
+        if status == 404 or "404" in text:
+            return "not found (404)"
+        if status:
+            return f"error {status}"
+        return "request error"
+
+    @staticmethod
+    def _decode_ddg_link(href: str) -> str:
+        """Decode a DuckDuckGo redirect link (/l/?uddg=<encoded>) into the real URL."""
+        try:
+            if "duckduckgo.com/l/" in href or "//duckduckgo.com" in href:
+                parsed = urllib.parse.urlparse(href)
+                params = urllib.parse.parse_qs(parsed.query)
+                uddg = params.get("uddg", [None])[0]
+                if uddg:
+                    return urllib.parse.unquote(uddg)
+        except Exception:
+            pass
+        return href
+
     def _duckduckgo_search(self, query: str) -> List[Dict[str, Any]]:
-        """DuckDuckGo HTML search — free, no API key required."""
-        with self._make_client() as client:
-            resp = self._retry_get(
-                client,
-                "https://html.duckduckgo.com/html/",
-                params={"q": query},
-                headers={"User-Agent": "evidence-mad/1.0"},
+        """DuckDuckGo HTML search — free, no API key required.
+
+        If DuckDuckGo is unavailable (rate limit, timeout, server error),
+        an OpenCode model answers instead. Results are presented under the
+        DuckDuckGo (web) agent identity with no provider commentary."""
+        try:
+            with self._make_client() as client:
+                resp = self._retry_get(
+                    client,
+                    "https://html.duckduckgo.com/html/",
+                    params={"q": query},
+                    headers={"User-Agent": "evidence-mad/1.0"},
+                )
+            matches = re.findall(
+                r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+                resp.text,
+                re.I | re.S,
             )
-        matches = re.findall(
-            r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-            resp.text,
-            re.I | re.S,
-        )
-        snippets = re.findall(
-            r'class="result__snippet"[^>]*>(.*?)</a>',
-            resp.text,
-            re.I | re.S,
-        )
+            snippets = re.findall(
+                r'class="result__snippet"[^>]*>(.*?)</a>',
+                resp.text,
+                re.I | re.S,
+            )
+        except Exception as exc:
+            issue = self._classify_provider_issue(exc)
+            logger.debug(f"DuckDuckGo retrieval issue ({issue}): {exc}")
+            return self._opencode_web_fallback(query, issue)
+
         results = []
         for i, (link, title) in enumerate(matches[: self.config.max_results]):
             results.append({
@@ -99,12 +141,17 @@ class SearchAgent(BaseAgent):
                     "",
                     html.unescape(snippets[i] if i < len(snippets) else title),
                 ).strip(),
-                "link": html.unescape(link),
+                "link": self._decode_ddg_link(html.unescape(link)),
             })
-        return results
+        if results:
+            return results
+        # No result links found (blocked/challenge page) — use the fallback
+        return self._opencode_web_fallback(query)
 
     def _wikipedia_search(self, query: str) -> List[Dict[str, Any]]:
-        """Wikipedia free public API — falls back to OpenCode on rate limit."""
+        """Wikipedia free public API — OpenCode fills in whenever Wikipedia
+        itself is unavailable (rate limit, timeout, network or parse error).
+        Results keep the Wikipedia identity; no provider switch is surfaced."""
         try:
             with self._make_client() as client:
                 resp = self._retry_get(
@@ -121,7 +168,7 @@ class SearchAgent(BaseAgent):
                     headers={"User-Agent": "EvidenceMAD/1.0 research contact@example.com"},
                 )
             items = resp.json().get("query", {}).get("search", [])
-            return [
+            results = [
                 {
                     "title": item.get("title", ""),
                     "snippet": re.sub(r"<[^>]+>", "", html.unescape(item.get("snippet", ""))).strip(),
@@ -129,9 +176,17 @@ class SearchAgent(BaseAgent):
                 }
                 for item in items
             ]
-        except (httpx.HTTPStatusError, httpx.TimeoutException) as exc:
-            logger.warning(f"Wikipedia failed ({exc}), falling back to OpenCode")
-            return self._opencode_wiki_fallback(query)
+            if results:
+                return results
+            issue = self._classify_provider_issue(
+                RuntimeError("empty result list")
+            )
+            logger.debug("Wikipedia returned no results")
+            return self._opencode_wiki_fallback(query, issue)
+        except Exception as exc:
+            issue = self._classify_provider_issue(exc)
+            logger.debug(f"Wikipedia retrieval issue ({issue}): {exc}")
+            return self._opencode_wiki_fallback(query, issue)
 
     def _crossref_search(self, query: str) -> List[Dict[str, Any]]:
         """Crossref scholarly metadata API — NO fallback on failure."""
@@ -164,13 +219,19 @@ class SearchAgent(BaseAgent):
             })
         return results
 
-    def _opencode_wiki_fallback(self, query: str) -> List[Dict[str, Any]]:
-        """Use OpenCode to answer when Wikipedia is rate-limited.
+    def _opencode_wiki_fallback(self, query: str, issue: str = "unavailable") -> List[Dict[str, Any]]:
+        """OpenCode answer used when Wikipedia is unavailable.
 
-        Structures the result as if it came from Wikipedia so the
-        rest of the pipeline treats it identically.
+        Results are structured as Wikipedia entries (Wikipedia identity,
+        wikipedia.org links) so the rest of the pipeline treats them
+        identically. Each row carries a `via_fallback` note so the API/UI
+        can surface a small 'Wikipedia <issue> — OpenCode fallback used'
+        message.
         """
         from agents.opencode_client import run_opencode
+
+        provider_label = self._PROVIDER_LABEL.get(self.config.provider, "Wikipedia")
+        fallback_note = f"{provider_label} {issue} — OpenCode fallback used"
 
         prompt = (
             f"Based on Wikipedia knowledge, provide a factual encyclopedic answer "
@@ -183,14 +244,48 @@ class SearchAgent(BaseAgent):
             results = []
             for i, sent in enumerate(sentences[:self.config.max_results]):
                 results.append({
-                    "title": f"Wikipedia - {query}" if i == 0 else f"Wikipedia (continued)",
+                    "title": f"Wikipedia - {query}" if i == 0 else "Wikipedia (continued)",
                     "snippet": sent,
-                    "link": f"https://en.wikipedia.org/wiki/{query.replace(' ', '_')}",
+                    "link": f"https://en.wikipedia.org/wiki/{re.sub(r'\\s+', '_', query.strip())}",
+                    "via_fallback": fallback_note,
                 })
             if results:
                 return results
         # If OpenCode also fails, return empty so the agent reports NO_RELEVANT_RESULTS
-        logger.warning(f"OpenCode wiki fallback also failed: {result.error if not result.ok else 'empty'}")
+        logger.debug(f"OpenCode wiki fallback also failed: {result.error if not result.ok else 'empty'}")
+        return []
+
+    def _opencode_web_fallback(self, query: str, issue: str = "unavailable") -> List[Dict[str, Any]]:
+        """OpenCode answer used when DuckDuckGo is unavailable.
+
+        Results keep the plain web-result shape so they appear under the
+        DuckDuckGo (web) agent. Each row carries a `via_fallback` note so
+        the API/UI can surface a small fallback message.
+        """
+        from agents.opencode_client import run_opencode
+
+        provider_label = self._PROVIDER_LABEL.get(self.config.provider, "DuckDuckGo")
+        fallback_note = f"{provider_label} {issue} — OpenCode fallback used"
+
+        prompt = (
+            f"Answer this question factually in 2-4 short sentences, citing the "
+            f"source or site where each fact is commonly published. "
+            f"Question: {query}"
+        )
+        result = run_opencode(prompt, settings.opencode_web_model, settings.opencode_timeout)
+        if result.ok and result.text:
+            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result.text) if s.strip()]
+            results = []
+            for i, sent in enumerate(sentences[: self.config.max_results]):
+                results.append({
+                    "title": f"{query.capitalize()}" if i == 0 else "Web (continued)",
+                    "snippet": sent,
+                    "link": "",
+                    "via_fallback": fallback_note,
+                })
+            if results:
+                return results
+        logger.debug(f"OpenCode web fallback also failed: {result.error if not result.ok else 'empty'}")
         return []
 
     # ------------------------------------------------------------------ #
@@ -198,7 +293,12 @@ class SearchAgent(BaseAgent):
     # ------------------------------------------------------------------ #
 
     def search(self, query: str) -> List[Dict[str, Any]]:
-        """Dispatch to the configured provider. Raises on failure (no fallback)."""
+        """Dispatch to the configured provider.
+
+        DuckDuckGo and Wikipedia fill in via OpenCode on any failure
+        (rate limit / timeout / network error) and tag each result row
+        with `via_fallback` describing what happened. Crossref raises.
+        """
         if self.config.provider == "wikipedia":
             return self._wikipedia_search(query)
         if self.config.provider == "crossref":
@@ -236,6 +336,18 @@ class SearchAgent(BaseAgent):
         claims = self.extract_claims(combined_text, sources)
         answer = self.generate_answer(query, claims, sources)
 
+        fallback_note = next(
+            (r.get("via_fallback") for r in search_results if r.get("via_fallback")),
+            None,
+        )
+        metadata = {
+            "search_results_count": len(search_results),
+            "provider": self.config.provider,
+        }
+        if fallback_note:
+            metadata["opencode_fallback"] = True
+            metadata["fallback_detail"] = fallback_note
+
         return Evidence(
             agent_id=self.agent_id,
             query=query,
@@ -243,10 +355,7 @@ class SearchAgent(BaseAgent):
             claims=claims,
             sources=sources,
             retrieved_text=combined_text,
-            metadata={
-                "search_results_count": len(search_results),
-                "provider": self.config.provider,
-            },
+            metadata=metadata,
         )
 
 

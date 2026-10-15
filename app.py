@@ -191,6 +191,14 @@ class MADSystem:
                         })
 
                     normalized = self.normalizer.normalize(agent_id, query, raw_results)
+
+                    # Propagate provider-fallback notes so the API/UI can show
+                    # a small 'provider rate-limited — OpenCode fallback used' message.
+                    raw_meta = raw_ev_dict.get("metadata") or {}
+                    if raw_meta.get("opencode_fallback"):
+                        normalized.metadata["opencode_fallback"] = True
+                        normalized.metadata["fallback_detail"] = raw_meta.get("fallback_detail", "")
+
                     agent_evidence.append(normalized)
 
                 # ----------------------------------------------------------------

@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     # Gemini (AI Answer Agent, primary)
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3.8-flash", alias="GEMINI_MODEL")
     gemini_timeout: float = Field(default=20.0, alias="GEMINI_TIMEOUT")
 
     # OpenCode CLI (AI Answer Agent, fallback)
@@ -53,6 +53,9 @@ class Settings(BaseSettings):
 
     # OpenCode fallback for Wikipedia (Reference Agent)
     opencode_wiki_model: str = Field(default="opencode/mimo-v2.6-flash-free", alias="OPENCODE_WIKI_MODEL")
+
+    # OpenCode fallback for DuckDuckGo (Web Agent)
+    opencode_web_model: str = Field(default="opencode/space-bunny-free", alias="OPENCODE_WEB_MODEL")
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -58,6 +58,37 @@ else
   echo "WARNING: 'opencode' not found on PATH. The AI agent OpenCode fallback will not work."
 fi
 
+# Free stale instances of this app from a previous run (they block the ports)
+free_port() {
+  local port="$1"
+  local pids=""
+  if command -v lsof >/dev/null 2>&1; then
+    pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -k tcp:"$port" 2>/dev/null || true
+    return
+  else
+    pids=$(ss -ltnp 2>/dev/null | grep -E ":$port " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)
+  fi
+  if [ -n "$pids" ]; then
+    for pid in $pids; do
+      local cmd
+      cmd=$(ps -o cmd= -p "$pid" 2>/dev/null || true)
+      case "$cmd" in
+        *uvicorn*api*|*http.server*3000*)
+          kill "$pid" 2>/dev/null || true
+          echo "Freed port $port (stopped stale process $pid)."
+          ;;
+        *) echo "WARNING: port $port is used by another program (pid $pid: ${cmd}). Start it manually." ;;
+      esac
+    done
+    sleep 1
+  fi
+}
+
+free_port 8000
+free_port 3000
+
 # Cleanup on exit
 cleanup() { kill ${BACKEND_PID:-} ${FRONTEND_PID:-} 2>/dev/null || true; }
 trap cleanup EXIT INT TERM

@@ -9,76 +9,77 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'DM Sans',system-ui,sans-serif;background:linear-gradient(168deg,#f0f4f8 0%,#e2e8f0 40%,#eef2f7 100%);color:#2d3748;line-height:1.65;font-size:15px;min-height:100vh}
+    body{font-family:'DM Sans',system-ui,sans-serif;background:linear-gradient(180deg,#fbfcfe 0%,#f2f5f9 100%);color:#2f3a4a;line-height:1.65;font-size:15px;min-height:100vh}
     main{max-width:1080px;margin:0 auto;padding:44px 24px 80px}
     h1{font-size:30px;font-weight:700;color:#1a2332;letter-spacing:-0.3px}
     h2{font-size:17px;font-weight:700;color:#1a2332;margin-bottom:14px}
     p.sub{color:#64748b;font-size:15px;margin-top:6px;margin-bottom:28px}
-    .card{background:rgba(255,255,255,0.82);backdrop-filter:blur(12px);border:1px solid rgba(203,213,225,0.6);border-radius:14px;padding:22px 24px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+    .card{background:#ffffff;border:1px solid #e4e9f1;border-radius:12px;padding:22px 24px;margin-bottom:14px;box-shadow:0 1px 3px rgba(23,36,61,0.04)}
     .sl{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#3b82f6;margin-bottom:14px}
-    textarea{width:100%;min-height:96px;resize:vertical;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e293b;padding:12px 14px;font:inherit;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
-    textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+    textarea{width:100%;min-height:96px;resize:vertical;border:1px solid #d3dae4;border-radius:9px;background:#fff;color:#1e293b;padding:12px 14px;font:inherit;font-size:14px;outline:none}
+    textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.10)}
     .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
-    button{border:none;border-radius:9px;padding:10px 22px;font-weight:700;font-size:14px;cursor:pointer;background:#3b82f6;color:#fff;box-shadow:0 1px 4px rgba(59,130,246,0.25);transition:background .15s}
+    button{border:none;border-radius:8px;padding:10px 22px;font-weight:600;font-size:14px;cursor:pointer;background:#3b82f6;color:#fff;box-shadow:0 1px 3px rgba(59,130,246,0.25)}
     button:hover{background:#2563eb}
-    button:disabled{cursor:wait;opacity:0.5}
+    button:disabled{cursor:wait;opacity:0.55}
     label{color:#64748b;display:flex;gap:6px;align-items:center;font-size:14px}
     input[type=checkbox]{accent-color:#3b82f6;width:16px;height:16px}
     .status{color:#64748b;min-height:20px;font-size:13px}
-    .errt{color:#dc2626}
+    .errt{color:#92400e}
     .ag{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
-    .ab{border:1px solid #e2e8f0;border-radius:10px;padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);transition:box-shadow .15s}
-    .ab:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+    .ab{border:1px solid #e4e9f1;border-radius:10px;padding:16px;background:#fbfcfe}
     .abh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .an{font-size:13px;font-weight:700;color:#1e293b}
-    .pl{display:inline-block;border-radius:5px;padding:2px 9px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
-    .pl-ok{background:#e0f2fe;color:#0369a1}
-    .pl-f{background:#fce4ec;color:#b71c4c}
-    .pl-n{background:#f3e8ff;color:#7c3aed}
+    .an{font-size:13px;font-weight:700;color:#26303d}
+    .pl{display:inline-block;border-radius:4px;padding:2px 9px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+    .pl-ok{background:#dcfce7;color:#15803d}
+    .pl-f{background:#fef3c7;color:#92400e}
+    .pl-n{background:#fef3c7;color:#92400e}
     .ac{font-size:13px;color:#334155;line-height:1.55}
     .as{font-size:12px;color:#64748b;margin-top:6px}
     .as a{color:#3b82f6;text-decoration:none}
     .as a:hover{text-decoration:underline}
-    .db{padding:14px 18px;border-radius:10px;font-weight:700;font-size:14px;margin-bottom:8px}
-    .d-ag{background:#e0f2fe;color:#0c4a6e;border:1px solid #bae6fd}
-    .d-di{background:#fef3c7;color:#78350f;border:1px solid #fde68a}
-    .d-un{background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe}
-    .d-in{background:#fce4ec;color:#881337;border:1px solid #fecdd3}
+    .fb{font-size:12px;color:#5f6470;margin-top:10px;padding:6px 10px;background:#f3f4f7;border:1px solid #e6e8ee;border-radius:6px}
+    .db{padding:14px 18px;border-radius:9px;font-weight:700;font-size:14px;margin-bottom:8px}
+    .d-ag{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
+    .d-di{background:#fee2e2;color:#dc2626;border:1px solid #fecaca}
+    .d-un{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+    .d-in{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
     .rat{font-size:13px;color:#64748b;margin-top:6px;line-height:1.5}
-    .fl{font-size:13px;color:#9f1239;margin-top:6px}
+    .fl{font-size:13px;color:#92400e;margin-top:6px}
     table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
     th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e2e8f0}
     th{font-weight:700;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.04em}
     td{color:#334155}
-    .hi{color:#be123c;font-weight:700}
+    .hi{color:#dc2626;font-weight:700}
     .cg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
-    .cb{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc;font-size:13px}
+    .cb{border:1px solid #e4e9f1;border-radius:9px;padding:14px;background:#fbfcfd;font-size:13px}
     .cl{font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px}
-    .dr{border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px;background:#f8fafc}
+    .dr{border:1px solid #e4e9f1;border-radius:9px;padding:14px;margin-bottom:10px;background:#fbfcfd}
     .drl{font-size:12px;font-weight:700;text-transform:uppercase;color:#3b82f6;margin-bottom:4px}
     .drc{font-size:13px;color:#334155;line-height:1.55}
     .jg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
-    .js{border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc;text-align:center}
+    .js{border:1px solid #e4e9f1;border-radius:9px;padding:12px;background:#fbfcfd;text-align:center}
     .jl{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700}
-    .jv{font-size:20px;font-weight:700;color:#1e293b;margin-top:4px}
-    .acard{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:14px;padding:24px 26px;margin-top:14px;box-shadow:0 2px 12px rgba(59,130,246,0.08)}
-    .acard h3{font-size:15px;font-weight:700;color:#1e40af;margin-bottom:12px}
+    .jv{font-size:20px;font-weight:700;color:#26303d;margin-top:4px}
+    .acard{background:#f7faff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:11px;padding:22px 26px;margin-top:14px;box-shadow:0 1px 3px rgba(59,130,246,0.08)}
+    .acard h3{font-size:15px;font-weight:700;color:#2563eb;margin-bottom:12px}
+    .srcard{background:#ffffff;border:1px solid #d9e0ee;border-radius:11px;padding:20px 24px;margin-top:12px;box-shadow:0 1px 3px rgba(23,36,61,0.04)}
+    .srcard h3{font-size:13px;font-weight:700;color:#2563eb;margin-bottom:10px}
+    .srcard ol{margin:0;padding-left:18px}
+    .srcard li{margin:5px 0;font-size:13px;color:#64748b}
+    .srcard a{color:#3b82f6;text-decoration:none}
+    .srcard a:hover{text-decoration:underline}
     .atxt{font-size:15px;color:#1e293b;line-height:1.75;white-space:pre-wrap}
     .rtxt{font-size:13px;color:#475569;margin-top:12px;line-height:1.6;white-space:pre-wrap}
-    .sh{font-size:14px;font-weight:700;color:#1e40af;margin-top:16px;margin-bottom:8px}
-    .sl2{margin-top:0;padding-left:18px}
-    .sl2 li{margin:5px 0;font-size:13px;color:#64748b}
-    .sl2 a{color:#3b82f6;text-decoration:none}
-    .sl2 a:hover{text-decoration:underline}
     .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-    .mt{border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc}
+    .mt{border:1px solid #e4e9f1;border-radius:9px;padding:12px;background:#fbfcfd}
     .ml{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:0.04em}
     .mv{font-size:20px;font-weight:700;color:#1e293b;margin-top:4px}
     details{margin-top:12px}
     summary{cursor:pointer;font-size:13px;color:#3b82f6;font-weight:600}
-    pre{overflow:auto;background:#f1f5f9;padding:14px;border-radius:10px;color:#334155;font-size:12px;margin-top:8px}
+    pre{overflow:auto;background:#f3f5f8;padding:14px;border-radius:9px;color:#334155;font-size:12px;margin-top:8px}
     .hidden{display:none}
-    footer{margin-top:36px;color:#94a3b8;font-size:12px;text-align:center}
+    footer{margin-top:36px;color:#8b95a3;font-size:12px;text-align:center}
   </style>
 </head>
 <body>
@@ -115,6 +116,23 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 const AN={'web_agent':'Web Agent (DuckDuckGo)','reference_agent':'Reference Agent (Wikipedia)','scholarly_agent':'Scholarly Agent (Crossref)','ai_answer_agent':'AI Answer Agent'};
 function agn(id){return AN[id]||id}
 
+function fbNote(a){
+  const m=a.metadata||{};
+  if(a.agent_id==='ai_answer_agent'){
+    if(m.backend_used==='opencode_fallback'){
+      const ge=String(m.gemini_error||'');
+      let why='unavailable';
+      if(/429|RESOURCE_EXHAUSTED|quota|exhaust/i.test(ge)) why='rate limit or quota exceeded';
+      else if(/404|no longer available/i.test(ge)) why='model unavailable';
+      else if(/timeout|timed/i.test(ge)) why='timed out';
+      return `Gemini API ${why} — OpenCode fallback used`;
+    }
+    return '';
+  }
+  if(m.opencode_fallback) return m.fallback_detail||'Provider unavailable — OpenCode fallback used';
+  return '';
+}
+
 function renderAgents(agents){
   if(!agents||!agents.length){$('agents').innerHTML='<p style="color:#94a3b8">No agent evidence.</p>';return}
   let h='';
@@ -125,12 +143,15 @@ function renderAgents(agents){
     else if(a.status==='no_relevant_results'||!a.claim){pc='pl-n';pt='NO DATA'}
     let cl='';
     if(a.claim) cl=`<div class="ac">${esc(a.claim)}</div>`;
-    else if(a.failure_reason) cl=`<div class="ac" style="color:#9f1239">${esc(a.failure_reason)}</div>`;
-    else cl=`<div class="ac" style="color:#94a3b8">No relevant results</div>`;
+    else if(a.failure_reason) cl=`<div class="ac" style="color:#92400e">${esc(a.failure_reason)}</div>`;
+    else cl=`<div class="ac" style="color:#92400e">No relevant results</div>`;
     let sr='';
     if(a.source_url && a.source_url.startsWith('http'))
       sr=`<div class="as"><a href="${esc(a.source_url)}" target="_blank" rel="noreferrer">${esc(a.source_title||a.source_url)}</a></div>`;
-    h+=`<div class="ab"><div class="abh"><span class="an">${esc(nm)}</span><span class="pl ${pc}">${pt}</span></div>${cl}${sr}</div>`;
+    const fb=fbNote(a);
+    let fbn='';
+    if(fb) fbn=`<div class="fb">${esc(fb)}</div>`;
+    h+=`<div class="ab"><div class="abh"><span class="an">${esc(nm)}</span><span class="pl ${pc}">${pt}</span></div>${cl}${sr}${fbn}</div>`;
   }
   $('agents').innerHTML=h;
 }
@@ -172,10 +193,12 @@ function renderAnswer(d){
   const answer=d.answer||'No answer generated.';
   const reasoning=d.reasoning||'';
 
+  // Final answer panel (highlighted)
   let ah=`<div class="acard"><h3>Final Answer</h3><div class="atxt">${esc(answer)}</div>`;
   if(reasoning) ah+=`<div class="rtxt">${esc(reasoning)}</div>`;
+  ah+=`</div>`;
 
-  // Collect all sources from agent evidence + final answer sources
+  // Sources panel (separate section below the answer)
   let allSources=[];
   if(d.agent_evidence){
     for(const a of d.agent_evidence){
@@ -193,13 +216,12 @@ function renderAnswer(d){
   }
 
   if(allSources.length){
-    ah+=`<div class="sh">Sources</div><ol class="sl2">`;
+    ah+=`<div class="srcard"><h3>Sources</h3><ol>`;
     for(const s of allSources){
       ah+=`<li><a href="${esc(s.url)}" target="_blank" rel="noreferrer">${esc(s.title||s.url)}</a></li>`;
     }
-    ah+=`</ol>`;
+    ah+=`</ol></div>`;
   }
-  ah+=`</div>`;
   $('answer').innerHTML=ah;
 }
 
