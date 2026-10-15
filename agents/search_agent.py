@@ -220,39 +220,57 @@ class SearchAgent(BaseAgent):
         return results
 
     def _opencode_wiki_fallback(self, query: str, issue: str = "unavailable") -> List[Dict[str, Any]]:
-        """OpenCode answer used when Wikipedia is unavailable.
+        """OpenCode Wikipedia-search fallback used when the API is unavailable.
 
-        Results are structured as Wikipedia entries (Wikipedia identity,
-        wikipedia.org links) so the rest of the pipeline treats them
-        identically. Each row carries a `via_fallback` note so the API/UI
-        can surface a small 'Wikipedia <issue> — OpenCode fallback used'
-        message.
+        OpenCode must search and fetch an English Wikipedia article before
+        answering. A response without that retrieved article URL is rejected,
+        rather than being treated as an answer from model knowledge.
         """
         from agents.opencode_client import run_opencode
 
         provider_label = self._PROVIDER_LABEL.get(self.config.provider, "Wikipedia")
         fallback_note = f"{provider_label} {issue} — OpenCode fallback used"
 
-        prompt = (
-            f"Based on Wikipedia knowledge, provide a factual encyclopedic answer "
-            f"to this question in 2-3 sentences: {query}"
-        )
+        prompt = f"""Use websearch to find the most relevant English Wikipedia article for this question:
+{query}
+
+Then use webfetch to read that exact Wikipedia article. Answer only from the
+retrieved article; do not use prior knowledge or another source. Return exactly
+these two lines:
+WIKIPEDIA_URL: <the fetched https://en.wikipedia.org/wiki/... URL>
+ANSWER: <a factual 2-3 sentence answer>
+
+If you cannot search and fetch a relevant English Wikipedia article, return
+exactly: WIKIPEDIA_NOT_RETRIEVED"""
         result = run_opencode(prompt, settings.opencode_wiki_model, settings.opencode_timeout)
         if result.ok and result.text:
-            # Split into sentences for multiple "search results"
-            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', result.text) if s.strip()]
-            results = []
-            for i, sent in enumerate(sentences[:self.config.max_results]):
-                results.append({
-                    "title": f"Wikipedia - {query}" if i == 0 else "Wikipedia (continued)",
-                    "snippet": sent,
-                    "link": f"https://en.wikipedia.org/wiki/{re.sub(r'\\s+', '_', query.strip())}",
-                    "via_fallback": fallback_note,
-                })
-            if results:
-                return results
-        # If OpenCode also fails, return empty so the agent reports NO_RELEVANT_RESULTS
-        logger.debug(f"OpenCode wiki fallback also failed: {result.error if not result.ok else 'empty'}")
+            output = result.text.strip()
+            url_match = re.search(
+                r"^WIKIPEDIA_URL:\s*(https://en\.wikipedia\.org/wiki/[^\s]+)\s*$",
+                output,
+                re.MULTILINE,
+            )
+            answer_match = re.search(r"^ANSWER:\s*(.+)$", output, re.MULTILINE | re.DOTALL)
+            if url_match and answer_match:
+                answer = answer_match.group(1).strip()
+                sentences = [
+                    sentence.strip()
+                    for sentence in re.split(r'(?<=[.!?])\s+', answer)
+                    if sentence.strip()
+                ]
+                if sentences:
+                    return [
+                        {
+                            "title": f"Wikipedia - {query}" if i == 0 else "Wikipedia (continued)",
+                            "snippet": sentence,
+                            "link": url_match.group(1),
+                            "via_fallback": fallback_note,
+                        }
+                        for i, sentence in enumerate(sentences[:self.config.max_results])
+                    ]
+            logger.debug("OpenCode wiki fallback did not return a fetched Wikipedia article")
+        # If OpenCode cannot retrieve Wikipedia, report no relevant results.
+        logger.debug(f"OpenCode wiki fallback failed: {result.error if not result.ok else 'empty'}")
         return []
 
     def _opencode_web_fallback(self, query: str, issue: str = "unavailable") -> List[Dict[str, Any]]:

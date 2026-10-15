@@ -1,9 +1,10 @@
 """
-test_search_fallbacks.py — OpenCode fill-in fallbacks for the search agents.
+test_search_fallbacks.py — OpenCode fallbacks for the search agents.
 
 Covers:
-  - Wikipedia 429 (rate limit) → OpenCode answers, results keep the
-    Wikipedia identity (title/link), and no provider-switch commentary.
+  - Wikipedia 429 (rate limit) → OpenCode retrieves a Wikipedia article,
+    results keep the Wikipedia identity (title/link), and no provider-switch
+    commentary.
   - DuckDuckGo 429 (rate limit) → OpenCode answers, results keep the plain
     web shape, and no provider-switch commentary.
   - DuckDuckGo redirect links are decoded into real URLs.
@@ -53,7 +54,8 @@ def mock_opencode():
     with patch("agents.opencode_client.run_opencode") as m:
         m.return_value.ok = True
         m.return_value.text = (
-            "Canberra is the capital city of Australia. "
+            "WIKIPEDIA_URL: https://en.wikipedia.org/wiki/Canberra\n"
+            "ANSWER: Canberra is the capital city of Australia. "
             "It is located in the Australian Capital Territory."
         )
         m.return_value.error = ""
@@ -85,6 +87,13 @@ class TestWikipediaOpenCodeFallback:
 
         results = agent.search("What is the boiling point of water?")
         assert results == []
+
+    def test_rejects_an_answer_without_a_fetched_wikipedia_url(self, mock_opencode):
+        agent = ReferenceAgent()
+        agent._make_client = _rate_limited_client
+        mock_opencode.return_value.text = "Canberra is the capital city of Australia."
+
+        assert agent.search("What is the capital of Australia?") == []
 
 
 class TestDuckDuckGoOpenCodeFallback:
