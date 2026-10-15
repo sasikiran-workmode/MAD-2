@@ -1,4 +1,4 @@
-# Evidence-MAD
+# Multi-Agent Debate Framework using Evidence Disagreement Triggering and Conflict-Type Classification
 
 Evidence-MAD is a research prototype for **evidence-triggered, conflict-type-aware multi-agent debate**.
 Three independent agents retrieve evidence in parallel, their claims are compared with
