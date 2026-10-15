@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evidence-MAD | Multi-Agent Debate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',system-ui,sans-serif;background:linear-gradient(168deg,#f0f4f8 0%,#e2e8f0 40%,#eef2f7 100%);color:#2d3748;line-height:1.65;font-size:15px;min-height:100vh}
+    main{max-width:1080px;margin:0 auto;padding:44px 24px 80px}
+    h1{font-size:30px;font-weight:700;color:#1a2332;letter-spacing:-0.3px}
+    h2{font-size:17px;font-weight:700;color:#1a2332;margin-bottom:14px}
+    p.sub{color:#64748b;font-size:15px;margin-top:6px;margin-bottom:28px}
+    .card{background:rgba(255,255,255,0.82);backdrop-filter:blur(12px);border:1px solid rgba(203,213,225,0.6);border-radius:14px;padding:22px 24px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+    .sl{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#3b82f6;margin-bottom:14px}
+    textarea{width:100%;min-height:96px;resize:vertical;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e293b;padding:12px 14px;font:inherit;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
+    textarea:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+    button{border:none;border-radius:9px;padding:10px 22px;font-weight:700;font-size:14px;cursor:pointer;background:#3b82f6;color:#fff;box-shadow:0 1px 4px rgba(59,130,246,0.25);transition:background .15s}
+    button:hover{background:#2563eb}
+    button:disabled{cursor:wait;opacity:0.5}
+    label{color:#64748b;display:flex;gap:6px;align-items:center;font-size:14px}
+    input[type=checkbox]{accent-color:#3b82f6;width:16px;height:16px}
+    .status{color:#64748b;min-height:20px;font-size:13px}
+    .errt{color:#dc2626}
+    .ag{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}
+    .ab{border:1px solid #e2e8f0;border-radius:10px;padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);transition:box-shadow .15s}
+    .ab:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+    .abh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .an{font-size:13px;font-weight:700;color:#1e293b}
+    .pl{display:inline-block;border-radius:5px;padding:2px 9px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+    .pl-ok{background:#e0f2fe;color:#0369a1}
+    .pl-f{background:#fce4ec;color:#b71c4c}
+    .pl-n{background:#f3e8ff;color:#7c3aed}
+    .ac{font-size:13px;color:#334155;line-height:1.55}
+    .as{font-size:12px;color:#64748b;margin-top:6px}
+    .as a{color:#3b82f6;text-decoration:none}
+    .as a:hover{text-decoration:underline}
+    .db{padding:14px 18px;border-radius:10px;font-weight:700;font-size:14px;margin-bottom:8px}
+    .d-ag{background:#e0f2fe;color:#0c4a6e;border:1px solid #bae6fd}
+    .d-di{background:#fef3c7;color:#78350f;border:1px solid #fde68a}
+    .d-un{background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe}
+    .d-in{background:#fce4ec;color:#881337;border:1px solid #fecdd3}
+    .rat{font-size:13px;color:#64748b;margin-top:6px;line-height:1.5}
+    .fl{font-size:13px;color:#9f1239;margin-top:6px}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+    th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #e2e8f0}
+    th{font-weight:700;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:0.04em}
+    td{color:#334155}
+    .hi{color:#be123c;font-weight:700}
+    .cg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+    .cb{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc;font-size:13px}
+    .cl{font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px}
+    .dr{border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px;background:#f8fafc}
+    .drl{font-size:12px;font-weight:700;text-transform:uppercase;color:#3b82f6;margin-bottom:4px}
+    .drc{font-size:13px;color:#334155;line-height:1.55}
+    .jg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+    .js{border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc;text-align:center}
+    .jl{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700}
+    .jv{font-size:20px;font-weight:700;color:#1e293b;margin-top:4px}
+    .acard{background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border:1px solid #bfdbfe;border-radius:14px;padding:24px 26px;margin-top:14px;box-shadow:0 2px 12px rgba(59,130,246,0.08)}
+    .acard h3{font-size:15px;font-weight:700;color:#1e40af;margin-bottom:12px}
+    .atxt{font-size:15px;color:#1e293b;line-height:1.75;white-space:pre-wrap}
+    .rtxt{font-size:13px;color:#475569;margin-top:12px;line-height:1.6;white-space:pre-wrap}
+    .sh{font-size:14px;font-weight:700;color:#1e40af;margin-top:16px;margin-bottom:8px}
+    .sl2{margin-top:0;padding-left:18px}
+    .sl2 li{margin:5px 0;font-size:13px;color:#64748b}
+    .sl2 a{color:#3b82f6;text-decoration:none}
+    .sl2 a:hover{text-decoration:underline}
+    .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+    .mt{border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#f8fafc}
+    .ml{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:0.04em}
+    .mv{font-size:20px;font-weight:700;color:#1e293b;margin-top:4px}
+    details{margin-top:12px}
+    summary{cursor:pointer;font-size:13px;color:#3b82f6;font-weight:600}
+    pre{overflow:auto;background:#f1f5f9;padding:14px;border-radius:10px;color:#334155;font-size:12px;margin-top:8px}
+    .hidden{display:none}
+    footer{margin-top:36px;color:#94a3b8;font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Evidence-MAD</h1>
+  <p class="sub">Multi-Agent Debate System -- Independent retrieval, evidence comparison, conflict-aware debate.</p>
+  <section class="card">
+    <h2>Ask the system</h2>
+    <textarea id="query" placeholder="Try: What is Python?">What is Python?</textarea>
+    <div class="toolbar">
+      <button id="solve">Solve question</button>
+      <label><input id="demo" type="checkbox" checked /> Demo mode (offline)</label>
+      <span id="status" class="status"></span>
+    </div>
+  </section>
+  <section id="result" class="hidden">
+    <div class="card"><div class="sl">Step 1 -- Independent Agent Evidence</div><div id="agents" class="ag"></div></div>
+    <div class="card"><div class="sl">Step 2 -- Evidence Comparison</div><div id="decision"></div><div id="nli-table"></div></div>
+    <div id="debate-section" class="hidden">
+      <div class="card"><div class="sl">Step 3 -- Conflict and Debate</div><div id="conflict-panel"></div><div id="debate-rounds"></div><div id="judge-panel"></div></div>
+    </div>
+    <div class="card">
+      <div class="sl">Step 4 -- Final Answer</div>
+      <div id="metrics" class="mg"></div>
+      <div id="answer"></div>
+    </div>
+    <div class="card"><details><summary>Show raw JSON trace</summary><pre id="trace"></pre></details></div>
+  </section>
+  <footer>Evidence-MAD -- Evidence-triggered debate with conflict-type-aware strategies.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+const AN={'web_agent':'Web Agent (DuckDuckGo)','reference_agent':'Reference Agent (Wikipedia)','scholarly_agent':'Scholarly Agent (Crossref)','ai_answer_agent':'AI Answer Agent'};
+function agn(id){return AN[id]||id}
+
+function renderAgents(agents){
+  if(!agents||!agents.length){$('agents').innerHTML='<p style="color:#94a3b8">No agent evidence.</p>';return}
+  let h='';
+  for(const a of agents){
+    const nm=agn(a.agent_id);
+    let pc='pl-ok',pt='OK';
+    if(a.status==='retrieval_failed'){pc='pl-f';pt='FAILED'}
+    else if(a.status==='no_relevant_results'||!a.claim){pc='pl-n';pt='NO DATA'}
+    let cl='';
+    if(a.claim) cl=`<div class="ac">${esc(a.claim)}</div>`;
+    else if(a.failure_reason) cl=`<div class="ac" style="color:#9f1239">${esc(a.failure_reason)}</div>`;
+    else cl=`<div class="ac" style="color:#94a3b8">No relevant results</div>`;
+    let sr='';
+    if(a.source_url && a.source_url.startsWith('http'))
+      sr=`<div class="as"><a href="${esc(a.source_url)}" target="_blank" rel="noreferrer">${esc(a.source_title||a.source_url)}</a></div>`;
+    h+=`<div class="ab"><div class="abh"><span class="an">${esc(nm)}</span><span class="pl ${pc}">${pt}</span></div>${cl}${sr}</div>`;
+  }
+  $('agents').innerHTML=h;
+}
+
+function renderDecision(d){
+  const s=d.evidence_state||'unknown';
+  const sl={'agreement':['d-ag','AGREEMENT -- sources agree, debate skipped'],'disagreement':['d-di','DISAGREEMENT -- conflict detected, debate triggered'],'uncertain':['d-un','UNCERTAIN -- sources unrelated, debate skipped'],'insufficient':['d-in','INSUFFICIENT -- not enough evidence retrieved']};
+  const[c,l]=sl[s]||['d-un',s.toUpperCase()];
+  let h=`<div class="db ${c}">${esc(l)}</div>`;
+  if(d.rationale) h+=`<div class="rat">${esc(d.rationale)}</div>`;
+  if(d.failed_agents&&d.failed_agents.length){const fl=d.failed_agents.map(f=>`${f.agent_id} (${f.reason})`).join(', ');h+=`<div class="fl">Failed agents: ${esc(fl)}</div>`}
+  $('decision').innerHTML=h;
+  if(d.pairwise&&d.pairwise.length){
+    let t='<table><thead><tr><th>Agent A</th><th>Agent B</th><th>Label</th><th>Contradiction</th><th>Entailment</th></tr></thead><tbody>';
+    for(const p of d.pairwise){const cc=p.contradiction_score>=0.7?'hi':'';t+=`<tr><td>${esc(agn(p.agent_a_id))}</td><td>${esc(agn(p.agent_b_id))}</td><td>${esc(p.label.toUpperCase())}</td><td class="${cc}">${p.contradiction_score.toFixed(3)}</td><td>${p.entailment_score.toFixed(3)}</td></tr>`}
+    t+='</tbody></table>';$('nli-table').innerHTML=t;
+  } else $('nli-table').innerHTML='';
+}
+
+function renderDebate(d){
+  if(!d.debate_triggered){$('debate-section').classList.add('hidden');return}
+  $('debate-section').classList.remove('hidden');
+  let ch='';
+  if(d.conflict){const c=d.conflict;ch=`<h3 style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:8px">Conflict Type: ${esc((c.type||'').toUpperCase())}</h3><p style="font-size:13px;color:#64748b;margin-bottom:10px">${esc(c.explanation||'')}</p><div class="cg"><div class="cb"><div class="cl">Claim A${c.agent_a_id?' ('+esc(agn(c.agent_a_id))+')':''}</div>${esc(c.claim_a||'')}</div><div class="cb"><div class="cl">Claim B${c.agent_b_id?' ('+esc(agn(c.agent_b_id))+')':''}</div>${esc(c.claim_b||'')}</div></div>`}
+  $('conflict-panel').innerHTML=ch;
+  let rh='';
+  if(d.debate_rounds&&d.debate_rounds.length){for(const r of d.debate_rounds)rh+=`<div class="dr"><div class="drl">Round ${r.round_number} -- ${esc(r.role)}</div><div class="drc">${esc(r.content)}</div></div>`}
+  $('debate-rounds').innerHTML=rh?`<h3 style="font-size:14px;font-weight:700;color:#1e293b;margin:16px 0 10px">Debate Transcript</h3>${rh}`:'';
+  let jh='';
+  if(d.judge){const j=d.judge;jh=`<h3 style="font-size:14px;font-weight:700;color:#1e293b;margin:16px 0 10px">Judge Verdict</h3><div class="jg"><div class="js"><div class="jl">Winner</div><div class="jv">${esc(j.winner||'N/A')}</div></div><div class="js"><div class="jl">Confidence</div><div class="jv">${j.confidence!=null?(j.confidence*100).toFixed(0)+'%':'N/A'}</div></div><div class="js"><div class="jl">Evidence</div><div class="jv">${j.evidence_score!=null?j.evidence_score.toFixed(2):'N/A'}</div></div><div class="js"><div class="jl">Reasoning</div><div class="jv">${j.reasoning_score!=null?j.reasoning_score.toFixed(2):'N/A'}</div></div></div><p style="font-size:13px;color:#64748b">${esc(j.reason||'')}</p>`}
+  $('judge-panel').innerHTML=jh;
+}
+
+function renderAnswer(d){
+  const m=d.metrics||{};
+  function mb(l,v){return`<div class="mt"><div class="ml">${esc(l)}</div><div class="mv">${esc(v)}</div></div>`}
+  $('metrics').innerHTML=[mb('Latency',`${Number(m.latency_seconds||0).toFixed(2)}s`),mb('Usable Agents',m.usable_agents||0),mb('Failed Agents',m.failed_agents||0),mb('LLM OK',m.total_llm_calls_ok||0),mb('LLM Failed',m.total_llm_calls_failed||0),mb('Debate Rounds',m.debate_rounds_used||0)].join('');
+
+  const answer=d.answer||'No answer generated.';
+  const reasoning=d.reasoning||'';
+
+  let ah=`<div class="acard"><h3>Final Answer</h3><div class="atxt">${esc(answer)}</div>`;
+  if(reasoning) ah+=`<div class="rtxt">${esc(reasoning)}</div>`;
+
+  // Collect all sources from agent evidence + final answer sources
+  let allSources=[];
+  if(d.agent_evidence){
+    for(const a of d.agent_evidence){
+      if(a.source_url && a.source_url.startsWith('http')){
+        allSources.push({url:a.source_url,title:a.source_title||agn(a.agent_id)});
+      }
+    }
+  }
+  if(d.sources){
+    for(const s of d.sources){
+      if(s.url && s.url.startsWith('http') && !allSources.find(x=>x.url===s.url)){
+        allSources.push(s);
+      }
+    }
+  }
+
+  if(allSources.length){
+    ah+=`<div class="sh">Sources</div><ol class="sl2">`;
+    for(const s of allSources){
+      ah+=`<li><a href="${esc(s.url)}" target="_blank" rel="noreferrer">${esc(s.title||s.url)}</a></li>`;
+    }
+    ah+=`</ol>`;
+  }
+  ah+=`</div>`;
+  $('answer').innerHTML=ah;
+}
+
+function render(d){
+  $('result').classList.remove('hidden');
+  renderAgents(d.agent_evidence);
+  renderDecision(d);
+  renderDebate(d);
+  renderAnswer(d);
+  $('trace').textContent=JSON.stringify(d,null,2);
+}
+
+$('solve').addEventListener('click',async()=>{
+  const q=$('query').value.trim();if(!q)return;
+  $('solve').disabled=true;$('status').textContent='Retrieving independent evidence...';$('status').className='status';
+  try{
+    const ab=location.port==='3000'?'http://localhost:8000':'';
+    const ac=new AbortController();const to=setTimeout(()=>ac.abort(),180000);
+    const r=await fetch(ab+'/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,demo_mode:$('demo').checked}),signal:ac.signal});
+    clearTimeout(to);const d=await r.json();if(!r.ok)throw new Error(d.detail||'Request failed');render(d);$('status').textContent='Completed';
+  }catch(e){$('status').innerHTML=`<span class="errt">${esc(e.message)}</span>`}finally{$('solve').disabled=false}
+});
+</script>
+</body>
+</html>
