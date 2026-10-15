@@ -4,12 +4,12 @@ Fails loudly on any error, counts calls per role (ok/failed).
 """
 import json
 import re
-import time
 from collections import defaultdict
 from typing import Optional, Dict, Any
 from loguru import logger
 import httpx
 
+from agents.opencode_client import run_opencode
 from config import settings
 
 
@@ -70,52 +70,74 @@ class LLMClient:
             LLMError: on any failure (missing key, network error, bad status, …)
         """
         if not self.api_key:
-            self.calls[role]["failed"] += 1
-            raise LLMError("No LLM API key configured")
+            return self._opencode_fallback(
+                prompt, system_prompt, role, "No LLM API key configured"
+            )
 
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        last_exc: Optional[Exception] = None
-        for attempt in range(1, settings.llm_max_retries + 1):
-            try:
-                resp = self.client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": self.temperature,
-                        "max_tokens": 1024,
-                    },
-                )
-                # Only retry on rate-limit or server errors
-                if resp.status_code == 400:
-                    # Prompt bug — no point retrying
-                    self.calls[role]["failed"] += 1
-                    raise LLMError(f"{role}: 400 Bad Request — {resp.text[:200]}")
-                resp.raise_for_status()
-                self.calls[role]["ok"] += 1
-                return resp.json()["choices"][0]["message"]["content"]
+        try:
+            resp = self.client.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": 1024,
+                },
+            )
+            if resp.status_code == 400:
+                raise LLMError(f"{role}: 400 Bad Request — {resp.text[:200]}")
+            resp.raise_for_status()
+            self.calls[role]["ok"] += 1
+            return resp.json()["choices"][0]["message"]["content"]
+        except Exception as exc:
+            # A rate limit, quota, timeout, invalid response, or any other
+            # primary-provider failure falls back immediately. Debate stages
+            # must not stop merely because Groq is temporarily unavailable.
+            return self._opencode_fallback(prompt, system_prompt, role, str(exc))
 
-            except LLMError:
-                raise
-            except httpx.HTTPStatusError as e:
-                last_exc = e
-                if attempt < settings.llm_max_retries:
-                    time.sleep(2 ** attempt)
-            except Exception as e:
-                last_exc = e
-                if attempt < settings.llm_max_retries:
-                    time.sleep(2 ** attempt)
+    def _opencode_fallback(
+        self,
+        prompt: str,
+        system_prompt: Optional[str],
+        role: str,
+        primary_error: str,
+    ) -> str:
+        """Run the configured OpenCode model when the primary LLM fails."""
+        prompt_parts = [
+            f"You are the fallback for the '{role}' stage of an evidence debate system.",
+            "Complete the task exactly as requested and preserve any required output format.",
+        ]
+        if system_prompt:
+            prompt_parts.append(f"SYSTEM INSTRUCTIONS:\n{system_prompt}")
+        prompt_parts.append(prompt)
+
+        logger.warning(
+            f"Primary LLM failed for {role}; using OpenCode fallback: {primary_error}"
+        )
+        result = run_opencode(
+            "\n\n".join(prompt_parts),
+            settings.opencode_model,
+            settings.opencode_timeout,
+        )
+        if result.ok and result.text:
+            self.calls[role]["ok"] += 1
+            return result.text
 
         self.calls[role]["failed"] += 1
-        raise LLMError(f"{role}: {last_exc}") from last_exc
+        fallback_error = result.error if not result.ok else "empty response"
+        raise LLMError(
+            f"{role}: primary LLM failed ({primary_error}); "
+            f"OpenCode fallback failed ({fallback_error})"
+        )
 
     def chat_json(self, prompt: str, system_prompt: Optional[str] = None, *, role: str) -> Dict[str, Any]:
         """

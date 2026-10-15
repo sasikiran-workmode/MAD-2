@@ -16,8 +16,13 @@ from evidence.models import AgentEvidence, EvidenceStatus, NormalizedClaim, Sour
 AGENT_ID = 'ai_answer_agent'
 
 PROMPT_TEMPLATE = (
-    'Answer the following question accurately in at most three sentences. '
-    'Do not invent sources or citations.\n\nQuestion: {query}'
+    'Answer the following question accurately in at most two sentences. '
+    'Do not invent sources or citations. Preserve every named entity exactly as '
+    'written in the question: never silently correct, replace, or assume that a '
+    'similarly named paper, product, person, or work is the same entity. If you '
+    'make an alias/typo assumption, state it explicitly; if the exact named entity '
+    'cannot be verified, say so explicitly. State the direct answer as one atomic '
+    'claim so it can be compared against independent evidence.\n\nQuestion: {query}'
 )
 
 

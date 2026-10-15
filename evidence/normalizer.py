@@ -81,6 +81,11 @@ Task:
    - IMPORTANT: If your answer corrects a false premise in the query (e.g. the user says
      "X was released in 2012" but it was actually 2017), state the CORRECT FACT directly.
      Do NOT write meta-commentary like "The snippets do not contain..." — just answer.
+   - Preserve the named entity in the query exactly.  Never silently substitute a
+     similarly named paper, product, person, or work from the snippets.  If the snippets
+     identify a likely alternate entity, say that it is an explicit assumption; if they
+     do not support the entity as written, answer that the exact entity is not verified.
+     Entity identity is a material fact for downstream NLI and debate.
 2. Extract any date/year, version number, and scope (platform / population / edition)
    from the most relevant snippet.
 

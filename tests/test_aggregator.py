@@ -97,6 +97,65 @@ class TestAggregatorStates:
         assert decision.state == EvidenceState.DISAGREEMENT
         assert decision.top_conflict is not None
 
+    def test_entity_substitution_opens_the_disagreement_gate(self):
+        nli = MockNLIDetector(threshold=0.7)
+        agg = EvidenceAggregator(nli_detector=nli)
+        ev_a = make_ev(
+            "a", 'The paper "Attention Is All You Need" was published in 2017, not 2082.'
+        )
+        ev_b = make_ev("b", "No such paper has been published in 2082.")
+
+        decision = agg.decide([ev_a, ev_b])
+
+        assert decision.state == EvidenceState.DISAGREEMENT
+        assert decision.top_conflict is not None
+
+    def test_query_target_mismatch_opens_gate_despite_shared_date_correction(self):
+        """Regression: a rejected queried title is not agreement with its autocorrection."""
+        query = "whipro is all u need paper is published in 2082"
+        nli = MockNLIDetector(threshold=0.7)
+        agg = EvidenceAggregator(nli_detector=nli)
+        web = make_ev(
+            "web_agent",
+            'The paper "Attention Is All You Need" was published in 2017, not 2082.',
+        )
+        reference = make_ev(
+            "reference_agent",
+            'The paper "Attention Is All You Need" was published in 2017, not 2082.',
+        )
+        ai = make_ev(
+            "ai_answer_agent",
+            'The paper "Attention Is All You Need" was published in 2017, and '
+            'there is no known paper titled "whipro is all u need" from 2082.',
+        )
+        for evidence in (web, reference, ai):
+            evidence.query = query
+
+        decision = agg.decide([web, reference, ai])
+
+        assert decision.state == EvidenceState.DISAGREEMENT
+        assert decision.top_conflict is not None
+        assert decision.top_conflict["contradiction_score"] >= 0.7
+
+    def test_explicit_verification_challenge_opens_gate_for_any_domain(self):
+        """An unsupported-fact finding must debate an affirmative answer."""
+        query = "Was AcmeDB version 4.0 released in 2024?"
+        nli = MockNLIDetector(threshold=0.7)
+        agg = EvidenceAggregator(nli_detector=nli)
+        affirmative = make_ev(
+            "web_agent", "AcmeDB version 4.0 was released in 2024."
+        )
+        challenge = make_ev(
+            "reference_agent",
+            "No official documentation verifies an AcmeDB version 4.0 release in 2024.",
+        )
+        affirmative.query = challenge.query = query
+
+        decision = agg.decide([affirmative, challenge])
+
+        assert decision.state == EvidenceState.DISAGREEMENT
+        assert decision.top_conflict["contradiction_score"] >= 0.7
+
     def test_agreement_all_pairs_entailing(self):
         # Build a fixture where both (A,B) and (A,C) and (B,C) are entailment
         fixtures = {}

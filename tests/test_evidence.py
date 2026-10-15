@@ -10,7 +10,9 @@ from evidence.models import (
 )
 from evidence.comparator import EvidenceComparator
 from evidence.aggregator import EvidenceAggregator
-from evidence.disagreement_detector import MockNLIDetector, NLIError, get_nli_detector
+from evidence.disagreement_detector import (
+    MockNLIDetector, NLIError, _pattern_predict, get_nli_detector,
+)
 
 
 # ------------------------------------------------------------------ #
@@ -204,6 +206,14 @@ class TestMockNLIDetector:
         assert result["disagreement"] is True
         assert result["contradiction_score"] >= 0.7
         assert "threshold" in result
+
+    def test_named_paper_substitution_conflicts_with_a_rejection(self):
+        result = _pattern_predict(
+            'The paper "Attention Is All You Need" was published in 2017, not 2082.',
+            'No such paper has been published in 2082.',
+        )
+        assert result["label"] == NLILabel.CONTRADICTION
+        assert result["all_scores"][NLILabel.CONTRADICTION] >= 0.7
 
 
 # ------------------------------------------------------------------ #

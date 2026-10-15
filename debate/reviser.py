@@ -82,14 +82,18 @@ ORIGINAL PROPOSAL:
 CRITIQUES TO ADDRESS:
 {critiques_text}
 
-Generate a revised argument (Round {round_number}) that:
-1. Directly addresses each critique
-2. Incorporates valid points from critiques
-3. Strengthens weak areas
-4. Provides a well-reasoned final position
-5. References specific evidence
+Return plain text only. Do not use Markdown, # characters, bullets, asterisks,
+or tables. Use exactly these section labels, each on its own line:
 
-Your revised proposal:"""
+REVISED POSITION
+<the improved position>
+CRITIQUE RESPONSES
+Critique 1: <how it was addressed>
+Critique 2: <how it was addressed>
+EVIDENCE REVIEW
+<only evidence present in the supplied claims>
+FINAL CONCLUSION
+<one concise revised resolution>"""
 
         response = self.llm_client.chat(prompt, role="reviser")
 

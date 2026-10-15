@@ -176,13 +176,20 @@ CONFLICT DETECTED:
 Conflict Type: {conflict_type.value}
 Explanation: {conflict_explanation}
 
-Generate a structured proposal (Round {round_number}) that:
-1. Analyses the evidence from both sides
-2. Identifies the core issue in the conflict
-3. Proposes an initial position supported by evidence
-4. References specific sources
+Return plain text only. Do not use Markdown, # characters, bullets, asterisks,
+or tables. Use exactly these section labels, each on its own line:
 
-Provide your proposal:"""
+POSITION
+<your proposed position>
+EVIDENCE REVIEW
+Claim A: <what the retrieved evidence supports>
+Claim B: <what the retrieved evidence supports>
+REASONING
+<the core issue and why the position follows>
+SOURCE BASIS
+<only sources or evidence present in the supplied claims>
+CONCLUSION
+<one concise proposed resolution>"""
 
         response = self.llm_client.chat(prompt, role="proposer")
 

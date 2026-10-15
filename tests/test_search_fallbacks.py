@@ -13,7 +13,7 @@ import httpx
 import pytest
 from unittest.mock import patch
 
-from agents.search_agent import ReferenceAgent, WebAgent, SearchAgent
+from agents.search_agent import ReferenceAgent, ScholarlyAgent, SearchAgent, WebAgent
 
 
 def _rate_limited_client() -> httpx.Client:
@@ -119,6 +119,24 @@ class TestDuckDuckGoOpenCodeFallback:
         # space-bunny-free is passed via settings.opencode_web_model
         model = mock_opencode.call_args[0][1]
         assert model.endswith("space-bunny-free")
+
+
+class TestScholarlyOpenCodeFallback:
+    def test_rate_limited_crossref_uses_a_fetched_scholarly_source(self, mock_opencode):
+        agent = ScholarlyAgent()
+        agent._make_client = _rate_limited_client
+        mock_opencode.return_value.text = (
+            "SCHOLARLY_URL: https://arxiv.org/abs/1706.03762\n"
+            "TITLE: Attention Is All You Need\n"
+            "ANSWER: The paper introduced the Transformer architecture. "
+            "It was published in 2017."
+        )
+
+        results = agent.search("Attention Is All You Need")
+
+        assert results
+        assert all(r["link"] == "https://arxiv.org/abs/1706.03762" for r in results)
+        assert all(r["title"] == "Attention Is All You Need" for r in results)
 
 
 class TestDuckDuckGoLinkDecoding:

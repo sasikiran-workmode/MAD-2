@@ -47,7 +47,12 @@ class TestBuildPrompt:
 
     def test_contains_length_limit(self):
         prompt = build_prompt("test")
-        assert "three sentences" in prompt.lower()
+        assert "two sentences" in prompt.lower()
+
+    def test_requires_explicit_entity_resolution(self):
+        prompt = build_prompt("When was whipro is all u need published?")
+        assert "never silently correct" in prompt.lower()
+        assert "state it explicitly" in prompt.lower()
 
 
 class TestShort:

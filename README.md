@@ -1,13 +1,16 @@
 # Evidence-MAD
 
 Evidence-MAD is a research prototype for **evidence-triggered, conflict-type-aware multi-agent debate**.
-Three independent agents retrieve evidence in parallel, their claims are compared with NLI, and debate only fires when the evidence genuinely disagrees.
+Three independent agents retrieve evidence in parallel, their claims are compared with
+query-aware NLI, and debate fires when any pair materially disagrees. This includes
+an agent rejecting a queried fact or entity as unsupported, unknown, unverifiable, or
+nonexistent while another agent gives an affirmative answer.
 
 ```text
 Question
   → parallel retrieval (Web + Reference + Scholarly agents)
   → relevance filter + LLM normalization → NormalizedClaim per agent
-  → NLI pairwise comparison → EvidenceDecision
+  → query-aware NLI pairwise comparison → EvidenceDecision
       AGREEMENT   → direct evidence answer, debate skipped
       UNCERTAIN   → "evidence neither agreed nor conflicted"
       INSUFFICIENT → explicit "not enough data" answer
@@ -89,6 +92,10 @@ OPENCODE_WEB_MODEL=opencode/space-bunny-free
 **NLI modes:**
 - `NLI_MODE=mock` — uses the real LLM (Groq) for NLI in LIVE mode; fastest option without downloading a model.
 - `NLI_MODE=transformers` — downloads and runs `ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli` locally. First run downloads ~1.4 GB.
+
+Both modes apply deterministic, query-aware guards before general NLI: explicit
+evidence challenges conflict with affirmative answers, and a silent named-entity
+substitution conflicts with an explicit rejection of the entity the user asked about.
 
 ## 4. Quick start — one command
 
@@ -308,7 +315,7 @@ Scholarly agent is only routed on queries containing academic keywords (study, t
 1. **Gemini** (`GEMINI_API_KEY` + `GEMINI_MODEL`) with Google Search grounding.
 2. **OpenCode CLI** (`opencode run --model OPENCODE_MODEL`) as fallback when Gemini fails.
 
-The agent returns one `AgentEvidence` directly (no search, no normalizer). Its claim is trimmed to ≤600 characters at a sentence boundary before NLI comparison.
+The agent returns one `AgentEvidence` directly (no search, no normalizer). Its claim is trimmed to ≤600 characters at a sentence boundary before NLI comparison. Its prompt requires named entities to be preserved exactly; any typo or alias assumption must be stated explicitly rather than silently substituted.
 
 ### Provider smoke test
 
@@ -334,24 +341,32 @@ PY
 Two-stage process per agent:
 
 1. **Relevance filter** (no LLM): content-word overlap between query and each result's title + snippet. Results below the threshold are dropped.
-2. **LLM normalization** (one call, `role="normalize"`): surviving snippets are condensed into one `NormalizedClaim` with `text`, `date`, `version`, and `scope` fields extracted.
+2. **LLM normalization** (one call, `role="normalize"`): surviving snippets are condensed into one `NormalizedClaim` with `text`, `date`, `version`, and `scope` fields extracted. The normalizer preserves the queried entity and marks any alternate-entity assumption explicitly.
 
 If no snippets survive or the LLM returns `{"answer": null}`, the agent is marked `NO_RELEVANT_RESULTS`.
 
 ### EvidenceAggregator (`evidence/aggregator.py`)
 
-Runs `NLIDetector.predict()` for every unordered pair of usable agents. Asymmetric decision rule:
+Runs query-aware NLI for every unordered pair of usable agents. Asymmetric decision rule:
 - ONE pair with contradiction ≥ `DISAGREEMENT_THRESHOLD` → DISAGREEMENT
 - ALL pairs with entailment ≥ `ENTAILMENT_THRESHOLD` → AGREEMENT
 - Otherwise → UNCERTAIN
+
+The gate passes the original question to NLI. A silent substitution of a named
+entity (such as a similarly titled paper) conflicts with an explicit statement
+that the entity as queried is unknown or nonexistent, even when both agents
+share a date correction; this is a disagreement and triggers debate. The same
+rule applies across domains when one agent explicitly finds that a requested
+fact is unsupported, unknown, unverifiable, or nonexistent and another makes
+an affirmative claim about it.
 
 ### NLI detectors (`evidence/disagreement_detector.py`)
 
 | Class | When used | Behaviour |
 |---|---|---|
-| `MockNLIDetector` | FIXTURE mode | Exact-match lookup from fixture table; raises `KeyError` on unknown pair |
-| `LLMNLIDetector` | LIVE + `NLI_MODE=mock` | Uses Groq/LLM to determine NLI label; falls back to patterns on LLM failure |
-| `NLIDetector` | LIVE + `NLI_MODE=transformers` | HuggingFace `text-classification` pipeline; runs both directions |
+| `MockNLIDetector` | FIXTURE mode | Exact-match lookup from fixture table; query-aware challenge guards still apply |
+| `LLMNLIDetector` | LIVE + `NLI_MODE=mock` | Uses a strict query-aware LLM prompt; falls back to guarded patterns on LLM failure |
+| `NLIDetector` | LIVE + `NLI_MODE=transformers` | HuggingFace `text-classification` pipeline; runs both directions after query-aware guards |
 
 ## 10. Execution traces
 
@@ -419,9 +434,9 @@ Test files and what they cover:
 | `tests/test_conflict.py` | ConflictClassifier (rule-based path), all 5 types |
 | `tests/test_conflict_types.py` | Extended conflict type classification |
 | `tests/test_search_fallbacks.py` | Wikipedia 429 → OpenCode fallback; DDG redirect decode |
-| `tests/test_ai_answer_agent.py` | AIAnswerAgent Gemini success, Gemini fail→OpenCode, both fail |
+| `tests/test_ai_answer_agent.py` | AIAnswerAgent Gemini success, Gemini fail→OpenCode, entity-preserving prompt |
 | `tests/test_baselines.py` | Evaluation system baselines |
-| `tests/test_aggregator.py` | EvidenceAggregator decision rules |
+| `tests/test_aggregator.py` | EvidenceAggregator rules, entity-resolution conflicts, and explicit verification challenges |
 | `tests/test_relevance.py` | Relevance filter in EvidenceNormalizer |
 | `tests/test_llm_failure.py` | LLM error propagation |
 | `tests/test_retrieval_failure.py` | Agent retrieval failure handling |

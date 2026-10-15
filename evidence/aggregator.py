@@ -71,7 +71,17 @@ class EvidenceAggregator:
 
             try:
                 if self.nli_detector:
-                    result = self.nli_detector.predict(claim_a.text, claim_b.text)
+                    # Query-aware NLI is essential for entity-resolution
+                    # conflicts: two agents may share a date correction while
+                    # answering about different named works.  Keep the
+                    # two-argument API as a compatibility fallback for custom
+                    # detectors used by integrations.
+                    predict_for_query = getattr(self.nli_detector, "predict_for_query", None)
+                    result = (
+                        predict_for_query(ev_a.query, claim_a.text, claim_b.text)
+                        if callable(predict_for_query)
+                        else self.nli_detector.predict(claim_a.text, claim_b.text)
+                    )
                     all_scores = result.get("all_scores", {})
                     contra = float(all_scores.get(NLILabel.CONTRADICTION, 0.0))
                     ent = float(all_scores.get(NLILabel.ENTAILMENT, 0.0))

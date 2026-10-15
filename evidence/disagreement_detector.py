@@ -23,6 +23,202 @@ class NLIError(Exception):
     """Raised when NLI inference fails (never silently returns neutral)."""
 
 
+def _entity_substitution_prediction(
+    premise: str, hypothesis: str
+) -> Optional[Dict[str, Any]]:
+    """Detect a named-work substitution versus an explicit rejection.
+
+    A claim that replaces the queried work with a differently named paper is
+    not an agreement with a claim that says the queried paper does not exist.
+    Generic NLI models often miss this because both claims can share a date
+    correction (for example, that a future year is impossible).
+    """
+    import re as _re
+
+    def has_rejection(text: str) -> bool:
+        return bool(_re.search(
+            r"\b(?:no such|does not exist|doesn't exist|no record of|"
+            r"cannot find|unable to find)\s+(?:an?\s+|the\s+)?"
+            r"(?:paper|article|publication|work)\b",
+            text,
+            _re.I,
+        ))
+
+    def names_a_work(text: str) -> bool:
+        return bool(_re.search(
+            r"\b(?:paper|article|publication|work)\s+[\"“][^\"”]{3,160}[\"”]",
+            text,
+            _re.I,
+        ))
+
+    if (has_rejection(premise) and names_a_work(hypothesis)) or (
+        has_rejection(hypothesis) and names_a_work(premise)
+    ):
+        return {
+            "label": NLILabel.CONTRADICTION,
+            "score": 0.91,
+            "all_scores": {
+                NLILabel.CONTRADICTION: 0.91,
+                NLILabel.ENTAILMENT: 0.05,
+                NLILabel.NEUTRAL: 0.04,
+            },
+        }
+    return None
+
+
+def _target_resolution_prediction(
+    query: str, premise: str, hypothesis: str
+) -> Optional[Dict[str, Any]]:
+    """Detect an answer-target conflict that ordinary NLI can flatten away.
+
+    Search agents will sometimes silently autocorrect a misspelled or unknown
+    title in the question, while another agent explicitly reports that the
+    title as written has no known record.  Both responses can share a true
+    date correction, so a generic NLI model may call them compatible.  They
+    are nevertheless competing resolutions of the user's target and must
+    open the debate gate.
+
+    This intentionally requires all three signals: a queried title, an
+    explicit rejection of that queried title, and a different title presented
+    as the answer.  That keeps an unrelated nonexistence statement neutral.
+    """
+    import re as _re
+
+    def normalise(value: str) -> str:
+        return " ".join(_re.findall(r"[a-z0-9]+", value.lower()))
+
+    def quoted_titles(text: str) -> set[str]:
+        return {
+            normalise(match)
+            for match in _re.findall(r"[\"“']([^\"”']{3,160})[\"”']", text)
+            if len(normalise(match).split()) >= 2
+        }
+
+    def rejected_titles(text: str) -> set[str]:
+        # Accept quoted and unquoted forms such as
+        # "no known paper titled whipro is all u need from 2082".
+        matches = _re.findall(
+            r"\b(?:no\s+(?:known\s+)?|no\s+such\s+|does not exist\s+as\s+(?:a\s+)?)"
+            r"(?:an?\s+|the\s+)?(?:paper|article|publication|work)"
+            r"(?:\s+(?:titled|called|named))?\s+"
+            r"(?:[\"“'](?P<quoted>[^\"”']{3,160})[\"”']|(?P<plain>[a-z0-9][a-z0-9 '\-]{2,100}?))"
+            r"(?=\s+(?:from|in|published|was|is|which|that)\b|[,.;]|$)",
+            text,
+            flags=_re.I,
+        )
+        return {
+            normalise(quoted or plain)
+            for quoted, plain in matches
+            if len(normalise(quoted or plain).split()) >= 2
+        }
+
+    query_norm = normalise(query)
+    rejected = rejected_titles(premise) | rejected_titles(hypothesis)
+    # A quoted title is the most reliable indicator that an agent selected a
+    # specific work.  Do not reuse rejected titles as positive resolutions.
+    positive = (quoted_titles(premise) | quoted_titles(hypothesis)) - rejected
+
+    rejected_query_titles = {
+        title for title in rejected
+        if query_norm and (title in query_norm or query_norm in title)
+    }
+    if not rejected_query_titles or not positive:
+        return None
+
+    for rejected_title in rejected_query_titles:
+        if any(title != rejected_title for title in positive):
+            return {
+                "label": NLILabel.CONTRADICTION,
+                "score": 0.93,
+                "all_scores": {
+                    NLILabel.CONTRADICTION: 0.93,
+                    NLILabel.ENTAILMENT: 0.03,
+                    NLILabel.NEUTRAL: 0.04,
+                },
+            }
+    return None
+
+
+def _explicit_challenge_prediction(
+    query: str, premise: str, hypothesis: str
+) -> Optional[Dict[str, Any]]:
+    """Treat an explicit evidence challenge as a material disagreement.
+
+    This is deliberately independent of paper titles, dates, or any other
+    domain-specific vocabulary.  When an agent says that the requested fact
+    or entity cannot be verified, is unsupported, or does not exist, another
+    agent cannot be considered to agree if it supplies an affirmative answer
+    to that same question.  A generic NLI model often calls that pair neutral
+    because the words differ; for the evidence gate it must be debated.
+
+    Mere corrections ("not 2082; it was 2017") are *not* challenges.  The
+    rule requires an epistemic or existence claim such as "no record",
+    "cannot verify", or "unsupported", which avoids turning ordinary shared
+    corrections into disagreement.
+    """
+    import re as _re
+
+    challenge_pattern = _re.compile(
+        r"\b(?:"
+        r"no\s+(?:(?:known|reliable|official|credible)\s+)?"
+        r"(?:record|evidence|source|documentation|information|verification|such)\b|"
+        r"(?:does not|doesn't|do not|don't)\s+exist\b|"
+        r"(?:cannot|can't|unable to|could not|couldn't)\s+"
+        r"(?:verify|find|confirm|locate|substantiate)\b|"
+        r"\b(?:unverified|unsupported|unsubstantiated|nonexistent|unknown)\b|"
+        r"\b(?:not\s+(?:verified|verifiable|supported|documented|confirmed))\b"
+        r")",
+        _re.I,
+    )
+
+    def content_words(text: str) -> set[str]:
+        stop = {
+            "the", "a", "an", "and", "or", "of", "in", "on", "at", "to",
+            "for", "from", "with", "is", "are", "was", "were", "be", "been",
+            "what", "when", "where", "who", "why", "how", "does", "do", "did",
+        }
+        return {
+            token for token in _re.findall(r"[a-z0-9]+", text.lower())
+            if token not in stop and len(token) > 1
+        }
+
+    # Claims have already passed the relevance filter, but require at least
+    # one query-topic token as a second guard against a stray disclaimer.
+    query_words = content_words(query)
+
+    def is_query_relevant_challenge(text: str) -> bool:
+        if not challenge_pattern.search(text):
+            return False
+        if query_words & content_words(text):
+            return True
+        # A concise answer may use a deictic reference ("cannot verify it").
+        # In an answer slot that pronoun refers to the current query.
+        return bool(query_words) and bool(
+            _re.search(r"\b(?:it|this|that|the claim|the premise)\b", text, _re.I)
+        )
+
+    premise_challenges = is_query_relevant_challenge(premise)
+    hypothesis_challenges = is_query_relevant_challenge(hypothesis)
+    if premise_challenges == hypothesis_challenges:
+        return None
+
+    affirmative = hypothesis if premise_challenges else premise
+    # A substantive, non-challenge answer is an affirmative competing claim.
+    # Do not fire on an empty or purely apologetic response.
+    if len(content_words(affirmative)) < 3:
+        return None
+
+    return {
+        "label": NLILabel.CONTRADICTION,
+        "score": 0.90,
+        "all_scores": {
+            NLILabel.CONTRADICTION: 0.90,
+            NLILabel.ENTAILMENT: 0.04,
+            NLILabel.NEUTRAL: 0.06,
+        },
+    }
+
+
 # ------------------------------------------------------------------ #
 # Real transformer NLI detector                                        #
 # ------------------------------------------------------------------ #
@@ -95,6 +291,10 @@ class NLIDetector:
         Predict NLI with bidirectional check (take stronger contradiction).
         Raises NLIError on failure.
         """
+        entity_prediction = _entity_substitution_prediction(premise, hypothesis)
+        if entity_prediction:
+            return entity_prediction
+
         self._load_model()
         fwd = self._run_once(premise, hypothesis)
         bwd = self._run_once(hypothesis, premise)
@@ -118,6 +318,16 @@ class NLIDetector:
         }
         best = max(all_scores, key=all_scores.__getitem__)
         return {"label": best, "score": all_scores[best], "all_scores": all_scores}
+
+    def predict_for_query(
+        self, query: str, premise: str, hypothesis: str
+    ) -> Dict[str, Any]:
+        """Classify a pair while preserving the question's named target."""
+        challenge_prediction = _explicit_challenge_prediction(query, premise, hypothesis)
+        if challenge_prediction:
+            return challenge_prediction
+        target_prediction = _target_resolution_prediction(query, premise, hypothesis)
+        return target_prediction or self.predict(premise, hypothesis)
 
     def detect_disagreement(self, text_a: str, text_b: str) -> Dict[str, Any]:
         result = self.predict(text_a, text_b)
@@ -144,12 +354,23 @@ class LLMNLIDetector:
     Much more accurate than keyword patterns for arbitrary real-world queries.
     """
 
-    _PROMPT = """You are an NLI (Natural Language Inference) classifier.
+    _PROMPT = """You are the strict NLI gate for an evidence-triggered debate.
 
+USER QUESTION: {query}
 Claim A: {claim_a}
 Claim B: {claim_b}
 
-Do these two claims CONTRADICT each other (i.e. they cannot both be true at the same time)?
+Determine whether these agents reached the SAME answer to the user's question.
+Classify a material difference as CONTRADICTION, even if the claims share one
+true detail.  In particular, CONTRADICTION is required when one agent silently
+substitutes a different named paper/article/product/person for the queried
+entity and another agent says the queried entity as written is unknown,
+nonexistent, or unsupported.  This is an entity-resolution conflict, not
+agreement.  Do not let a shared date correction hide that conflict.
+Likewise, if one agent explicitly says the requested fact cannot be verified,
+has no reliable/official support, or does not exist, and the other supplies an
+affirmative answer, classify CONTRADICTION.  Do not downgrade that evidence
+challenge to NEUTRAL merely because it uses different wording.
 
 Answer with ONLY a JSON object:
 {{
@@ -161,8 +382,13 @@ Answer with ONLY a JSON object:
 }}
 
 Guidelines:
-- CONTRADICTION: the claims directly conflict (different facts, different numbers, opposite statements about the same thing)
-- ENTAILMENT: one claim supports or is consistent with the other
+- CONTRADICTION: the claims give different facts, different numbers, opposite statements about the same thing, or different resolutions of the entity the user asked about.
+- ENTITY SUBSTITUTION: if one claim names a paper, article, or other entity while
+  the other rejects the queried entity as nonexistent, classify CONTRADICTION.
+  Do not mark them as entailing merely because both reject a date in the query.
+- EVIDENCE CHALLENGE: "cannot verify", "no record", "unsupported", or a similar
+  rejection of the requested fact conflicts with another agent's affirmative answer.
+- ENTAILMENT: the claims have the same answer target and every material assertion is compatible.
 - NEUTRAL: the claims are about different things or neither supports nor contradicts the other"""
 
     def __init__(self, threshold: float = 0.70, llm_client=None):
@@ -170,13 +396,31 @@ Guidelines:
         self.llm_client = llm_client
 
     def predict(self, premise: str, hypothesis: str) -> Dict[str, Any]:
+        return self.predict_for_query("", premise, hypothesis)
+
+    def predict_for_query(
+        self, query: str, premise: str, hypothesis: str
+    ) -> Dict[str, Any]:
+        entity_prediction = _entity_substitution_prediction(premise, hypothesis)
+        if entity_prediction:
+            return entity_prediction
+        challenge_prediction = _explicit_challenge_prediction(query, premise, hypothesis)
+        if challenge_prediction:
+            return challenge_prediction
+        target_prediction = _target_resolution_prediction(query, premise, hypothesis)
+        if target_prediction:
+            return target_prediction
         if not self.llm_client:
             # Fallback to simple pattern if no LLM available
             return _pattern_predict(premise, hypothesis)
         try:
             from llm_client import LLMError
-            prompt = self._PROMPT.format(claim_a=premise, claim_b=hypothesis)
-            result = self.llm_client.chat_json(prompt, role="normalize")
+            prompt = self._PROMPT.format(
+                query=query or "(Question context unavailable)",
+                claim_a=premise,
+                claim_b=hypothesis,
+            )
+            result = self.llm_client.chat_json(prompt, role="nli")
             contra = float(result.get("contradiction_score", 0.0))
             ent = float(result.get("entailment_score", 0.0))
             neu = float(result.get("neutral_score", 0.0))
@@ -223,6 +467,10 @@ def _pattern_predict(premise: str, hypothesis: str) -> Dict[str, Any]:
 
     p = premise.lower()
     h = hypothesis.lower()
+
+    entity_prediction = _entity_substitution_prediction(premise, hypothesis)
+    if entity_prediction:
+        return entity_prediction
 
     # ── 1. Different years anywhere in the two claims ─────────────────
     # Only extract years that are being *asserted*, not years that are
@@ -350,6 +598,15 @@ class MockNLIDetector:
             return {"label": entry["label"], "score": entry["score"], "all_scores": entry["all_scores"]}
 
         return _pattern_predict(premise, hypothesis)
+
+    def predict_for_query(
+        self, query: str, premise: str, hypothesis: str
+    ) -> Dict[str, Any]:
+        challenge_prediction = _explicit_challenge_prediction(query, premise, hypothesis)
+        if challenge_prediction:
+            return challenge_prediction
+        target_prediction = _target_resolution_prediction(query, premise, hypothesis)
+        return target_prediction or self.predict(premise, hypothesis)
 
     def detect_disagreement(self, text_a: str, text_b: str) -> Dict[str, Any]:
         result = self.predict(text_a, text_b)

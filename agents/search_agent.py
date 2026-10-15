@@ -189,35 +189,91 @@ class SearchAgent(BaseAgent):
             return self._opencode_wiki_fallback(query, issue)
 
     def _crossref_search(self, query: str) -> List[Dict[str, Any]]:
-        """Crossref scholarly metadata API — NO fallback on failure."""
-        with self._make_client() as client:
-            resp = self._retry_get(
-                client,
-                "https://api.crossref.org/works",
-                params={
-                    "query.bibliographic": query,
-                    "rows": self.config.max_results,
-                    "select": "title,URL,container-title,published",
-                },
-                headers={"User-Agent": "EvidenceMAD/1.0 (mailto:research@example.com)"},
-            )
-        items = resp.json().get("message", {}).get("items", [])
-        results = []
-        for item in items:
-            title = (item.get("title") or ["Untitled"])[0]
-            venue = (item.get("container-title") or [""])[0]
-            published = item.get("published", {}).get("date-parts", [[""]])[0]
-            year = published[0] if published else ""
-            results.append({
-                "title": title,
-                "snippet": (
-                    f"Scholarly work indexed by Crossref"
-                    f"{f' · {venue}' if venue else ''}"
-                    f"{f' · {year}' if year else ''}"
-                ),
-                "link": item.get("URL", ""),
-            })
-        return results
+        """Crossref scholarly metadata API with an OpenCode search fallback."""
+        try:
+            with self._make_client() as client:
+                resp = self._retry_get(
+                    client,
+                    "https://api.crossref.org/works",
+                    params={
+                        "query.bibliographic": query,
+                        "rows": self.config.max_results,
+                        "select": "title,URL,container-title,published",
+                    },
+                    headers={"User-Agent": "EvidenceMAD/1.0 (mailto:research@example.com)"},
+                )
+            items = resp.json().get("message", {}).get("items", [])
+            results = []
+            for item in items:
+                title = (item.get("title") or ["Untitled"])[0]
+                venue = (item.get("container-title") or [""])[0]
+                published = item.get("published", {}).get("date-parts", [[""]])[0]
+                year = published[0] if published else ""
+                results.append({
+                    "title": title,
+                    "snippet": (
+                        f"Scholarly work indexed by Crossref"
+                        f"{f' · {venue}' if venue else ''}"
+                        f"{f' · {year}' if year else ''}"
+                    ),
+                    "link": item.get("URL", ""),
+                })
+            if results:
+                return results
+            return self._opencode_scholarly_fallback(query, "returned no results")
+        except Exception as exc:
+            issue = self._classify_provider_issue(exc)
+            logger.debug(f"Crossref retrieval issue ({issue}): {exc}")
+            return self._opencode_scholarly_fallback(query, issue)
+
+    def _opencode_scholarly_fallback(
+        self, query: str, issue: str = "unavailable"
+    ) -> List[Dict[str, Any]]:
+        """Use OpenCode to retrieve a scholarly source when Crossref fails."""
+        from agents.opencode_client import run_opencode
+
+        fallback_note = f"Crossref {issue} — OpenCode fallback used"
+        model = settings.opencode_scholarly_model or settings.opencode_model
+        prompt = f"""Use websearch to find a relevant scholarly source for this question:
+{query}
+
+Use webfetch to read the selected source. Prefer a DOI landing page, arXiv,
+or an academic publisher. Answer only from the fetched source; do not use prior
+knowledge or another source. Return exactly these three lines:
+SCHOLARLY_URL: <the fetched https URL>
+TITLE: <the source title>
+ANSWER: <a factual 2-3 sentence answer>
+
+If you cannot search and fetch a relevant scholarly source, return exactly:
+SCHOLARLY_SOURCE_NOT_RETRIEVED"""
+        result = run_opencode(prompt, model, settings.opencode_timeout)
+        if result.ok and result.text:
+            output = result.text.strip()
+            url_match = re.search(r"^SCHOLARLY_URL:\s*(https://[^\s]+)\s*$", output, re.MULTILINE)
+            title_match = re.search(r"^TITLE:\s*(.+)$", output, re.MULTILINE)
+            answer_match = re.search(r"^ANSWER:\s*(.+)$", output, re.MULTILINE | re.DOTALL)
+            if url_match and title_match and answer_match:
+                answer = answer_match.group(1).strip()
+                sentences = [
+                    sentence.strip()
+                    for sentence in re.split(r'(?<=[.!?])\s+', answer)
+                    if sentence.strip()
+                ]
+                if sentences:
+                    return [
+                        {
+                            "title": title_match.group(1).strip(),
+                            "snippet": sentence,
+                            "link": url_match.group(1),
+                            "via_fallback": fallback_note,
+                        }
+                        for sentence in sentences[:self.config.max_results]
+                    ]
+            logger.debug("OpenCode scholarly fallback did not return a fetched source")
+        logger.debug(
+            f"OpenCode scholarly fallback failed: {result.error if not result.ok else 'empty'}"
+        )
+        return []
 
     def _opencode_wiki_fallback(self, query: str, issue: str = "unavailable") -> List[Dict[str, Any]]:
         """OpenCode Wikipedia-search fallback used when the API is unavailable.
@@ -313,9 +369,8 @@ exactly: WIKIPEDIA_NOT_RETRIEVED"""
     def search(self, query: str) -> List[Dict[str, Any]]:
         """Dispatch to the configured provider.
 
-        DuckDuckGo and Wikipedia fill in via OpenCode on any failure
-        (rate limit / timeout / network error) and tag each result row
-        with `via_fallback` describing what happened. Crossref raises.
+        Every provider fills in via OpenCode on rate limits, timeouts, empty
+        results, or network errors, and tags fallback results with `via_fallback`.
         """
         if self.config.provider == "wikipedia":
             return self._wikipedia_search(query)

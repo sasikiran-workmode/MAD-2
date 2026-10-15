@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # OpenCode fallback for DuckDuckGo (Web Agent)
     opencode_web_model: str = Field(default="opencode/space-bunny-free", alias="OPENCODE_WEB_MODEL")
 
+    # OpenCode fallback for Crossref (Scholarly Agent). Empty uses OPENCODE_MODEL.
+    opencode_scholarly_model: str = Field(default="", alias="OPENCODE_SCHOLARLY_MODEL")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

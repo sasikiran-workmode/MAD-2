@@ -63,8 +63,6 @@ class Critic:
         agent_b_id = top_conflict.get("agent_b_id", "agent_b")
 
         prompt = f"""You are a critical analyst in a structured debate.
-Also return a JSON field "substantive_objection": true/false at the end,
-indicating whether you found a real logical flaw (true) or the proposal is already sound (false).
 
 QUESTION: {query}
 CONFLICT TYPE: {conflict_type.value}
@@ -76,14 +74,26 @@ ORIGINAL CLAIMS:
 PROPOSAL TO CRITIQUE:
 {proposal.content}
 
-Generate TWO distinct critiques that:
-1. Identify logical weaknesses or unsupported claims
-2. Challenge assumptions the proposer made
-3. Point out missing evidence or reasoning gaps
-4. Suggest specific improvements
+Return plain text only. Do not use Markdown, # characters, bullets, asterisks,
+or tables. Use exactly this structure:
 
-Format each critique clearly as CRITIQUE 1 and CRITIQUE 2.
-After the critiques, add a final line: SUBSTANTIVE_OBJECTION: true or false"""
+CRITIQUE 1
+ISSUE
+<one specific weakness or "No substantive weakness found">
+WHY IT MATTERS
+<brief explanation>
+IMPROVEMENT
+<specific improvement>
+
+CRITIQUE 2
+ISSUE
+<a different specific weakness or "No substantive weakness found">
+WHY IT MATTERS
+<brief explanation>
+IMPROVEMENT
+<specific improvement>
+
+SUBSTANTIVE_OBJECTION: true or false"""
 
         response = self.llm_client.chat(prompt, role="critic")
 
@@ -94,10 +104,16 @@ After the critiques, add a final line: SUBSTANTIVE_OBJECTION: true or false"""
         if sub_match:
             sub_obj = sub_match.group(1).lower() == "true"
 
-        # Split into two critiques
-        parts = response.split("CRITIQUE 2")
-        content_1 = parts[0].replace("CRITIQUE 1", "").strip() if len(parts) == 2 else response[: len(response) // 2]
-        content_2 = parts[1].strip() if len(parts) == 2 else response[len(response) // 2:]
+        # Keep the display content clean while preserving the objection flag in metadata.
+        display_response = re.sub(
+            r"\n?SUBSTANTIVE_OBJECTION:\s*(true|false)\s*$", "", response,
+            flags=re.I,
+        ).strip()
+        parts = re.split(r"^\s*CRITIQUE\s+2\s*:?[ \t]*\n?", display_response, maxsplit=1, flags=re.I | re.M)
+        content_1 = re.sub(
+            r"^\s*CRITIQUE\s+1\s*:?[ \t]*\n?", "", parts[0], flags=re.I
+        ).strip()
+        content_2 = parts[1].strip() if len(parts) == 2 else "No second critique was returned."
 
         return [
             DebateArgument(
