@@ -81,7 +81,7 @@ GEMINI_MODEL=gemini-3.8-flash
 GEMINI_TIMEOUT=20
 
 # OpenCode CLI fallback for AI Answer Agent
-OPENCODE_MODEL=opencode/muse-spark-1.3-contributor-free
+OPENCODE_MODEL=opencode/deepseek-v4.1-flash-free
 OPENCODE_TIMEOUT=45
 
 # OpenCode fallbacks for search agents

@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     gemini_timeout: float = Field(default=20.0, alias="GEMINI_TIMEOUT")
 
     # OpenCode CLI (AI Answer Agent, fallback)
-    opencode_model: str = Field(default="opencode/muse-spark-1.3-contributor-free", alias="OPENCODE_MODEL")
+    opencode_model: str = Field(default="opencode/deepseek-v4.1-flash-free", alias="OPENCODE_MODEL")
     opencode_timeout: float = Field(default=45.0, alias="OPENCODE_TIMEOUT")
 
     # OpenCode fallback for Wikipedia (Reference Agent)

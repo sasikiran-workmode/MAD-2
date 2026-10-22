@@ -27,7 +27,7 @@ def run_opencode(prompt: str, model: str, timeout: float) -> OpenCodeResult:
 
     Args:
         prompt:  the full prompt string
-        model:   model identifier, e.g. 'opencode/muse-spark-1.3-contributor-free'
+        model:   model identifier, e.g. 'opencode/deepseek-v4.1-flash-free'
         timeout: maximum seconds to wait
 
     Returns:

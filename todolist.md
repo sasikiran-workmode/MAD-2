@@ -35,7 +35,7 @@ Every item below was audited file by file, fixed, and verified:
       `OPENCODE_WIKI_MODEL` also added to `.env`/`.env.example` where it was missing.
 - [x] **B5. Gemini→OpenCode fallback verified live** — with the Gemini key over
       quota (429 RESOURCE_EXHAUSTED), the AI Answer Agent automatically answered
-      through `opencode/muse-spark-1.3-contributor-free` and the query still completed.
+      through `opencode/deepseek-v4.1-flash-free` and the query still completed.
 
 ## Phase C — Real Gemini failure fixed (provider deprecation)
 - [x] **C1. `gemini-2.5-flash` is retired upstream (404 NOT_FOUND for the key).**
@@ -70,7 +70,7 @@ Every item below was audited file by file, fixed, and verified:
 - [x] `api/index.py` + `vercel.json` — Vercel entrypoint intact.
 - [x] `requirements.txt` — every pinned version matches the installed venv exactly.
 - [x] Previous instruction re-checked and intact: **Gemini primary → OpenCode
-      `opencode/muse-spark-1.3-contributor-free` fallback → response passes into the
+      `opencode/deepseek-v4.1-flash-free` fallback → response passes into the
       existing evidence aggregation / NLI / conflict / debate pipeline; Groq
       functionality, conflict types, and the NLI transformer all unchanged.**
 
@@ -86,7 +86,7 @@ Every item below was audited file by file, fixed, and verified:
 | `./start_mad.sh` on clean ports | backend `/health` 200, frontend 200 |
 | `./start_mad.sh` with stale 8000/3000 processes running | stale instances freed, ports rebound cleanly |
 | Live LIVE-mode query via API ("What is the capital of France?") | `agreement`, correct answer, 6 OK / 0 failed LLM calls |
-| AI Answer Agent with Gemini quota-exhausted | auto-answers via `opencode/muse-spark-1.3-contributor-free` |
+| AI Answer Agent with Gemini quota-exhausted | auto-answers via `opencode/deepseek-v4.1-flash-free` |
 | Wikipedia rate-limited | answers via `opencode/mimo-v2.6-flash-free`, shown as "Wikipedia" |
 | DuckDuckGo rate-limited | answers via `opencode/space-bunny-free`, shown as "Web Agent (DuckDuckGo)" |
 
